@@ -1180,6 +1180,11 @@ app.use(async (req, res) => {
     return res.redirect(`/openclaw?token=${OPENCLAW_GATEWAY_TOKEN}`);
   }
 
+  // Proxy voice webhook to voice-call plugin (port 3334)
+  if (req.path.startsWith("/voice/")) {
+    return proxy.web(req, res, { target: "http://127.0.0.1:3334" });
+  }
+
   return proxy.web(req, res, { target: GATEWAY_TARGET });
 });
 
