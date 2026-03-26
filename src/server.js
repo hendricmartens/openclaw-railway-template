@@ -1252,6 +1252,12 @@ server.on("upgrade", async (req, socket, head) => {
     socket.destroy();
     return;
   }
+  // Route voice media stream WebSocket to voice-call plugin (port 3334)
+  if (url.pathname.startsWith("/voice/")) {
+    proxy.ws(req, socket, head, { target: "http://127.0.0.1:3334" });
+    return;
+  }
+
   proxy.ws(req, socket, head, { target: GATEWAY_TARGET });
 });
 
