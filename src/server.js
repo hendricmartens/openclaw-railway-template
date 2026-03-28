@@ -1202,6 +1202,24 @@ app.use(async (req, res) => {
     return res.redirect(`/openclaw?token=${OPENCLAW_GATEWAY_TOKEN}`);
   }
 
+  // Fire-and-forget hook execution for cross-service calls
+  if (req.path === "/hooks-execute") {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader || authHeader !== `Bearer ${OPENCLAW_GATEWAY_TOKEN}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    // Forward to gateway hooks immediately and return 202
+    const hookToken = req.headers["x-hook-token"] || "";
+    const body = req.body || {};
+    // Fire async request to local gateway
+    fetch(`http://127.0.0.1:${INTERNAL_GATEWAY_PORT}/hooks/agent`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${hookToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).catch((e) => log.warn("hooks-execute", `async error: ${e.message}`));
+    return res.status(202).json({ ok: true });
+  }
+
   // Proxy voice webhook to voice-call plugin (port 3334)
   if (req.path.startsWith("/voice/")) {
     return proxy.web(req, res, { target: "http://127.0.0.1:3334" });
