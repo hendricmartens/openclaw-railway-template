@@ -1176,6 +1176,28 @@ app.use(async (req, res) => {
     }
   }
 
+  // Internal API: serve agent prompts for other services (voice bridge, etc.)
+  if (req.path === "/prompts") {
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const stateDir = process.env.OPENCLAW_STATE_DIR || path.join(require("os").homedir(), ".openclaw");
+      const workspaceDir = process.env.OPENCLAW_WORKSPACE_DIR || path.join(stateDir, "workspace");
+      const readFile = (name) => {
+        try { return fs.default.readFileSync(path.join(workspaceDir, name), "utf8"); }
+        catch { return ""; }
+      };
+      return res.json({
+        soul: readFile("SOUL.md"),
+        user: readFile("USER.md"),
+        agents: readFile("AGENTS.md"),
+        identity: readFile("IDENTITY.md"),
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (req.path === "/openclaw" && !req.query.token) {
     return res.redirect(`/openclaw?token=${OPENCLAW_GATEWAY_TOKEN}`);
   }
