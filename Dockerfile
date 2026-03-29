@@ -12,7 +12,12 @@ RUN apt-get update \
     zip \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g openclaw@2026.3.28 clawhub@latest acpx@latest
+RUN npm install -g openclaw@2026.3.24 clawhub@latest
+
+# Fix acpx plugin permissions and pre-install binary
+RUN chown -R 1000:1000 /usr/local/lib/node_modules/openclaw/dist/extensions/acpx \
+  && cd /usr/local/lib/node_modules/openclaw/dist/extensions/acpx \
+  && npm install acpx@0.3.1
 
 WORKDIR /app
 
@@ -22,10 +27,11 @@ RUN corepack enable && pnpm install --frozen-lockfile --prod
 COPY src ./src
 COPY --chmod=755 entrypoint.sh ./entrypoint.sh
 
-RUN useradd -m -s /bin/bash openclaw \
+RUN useradd -m -s /bin/bash -u 1000 openclaw \
   && chown -R openclaw:openclaw /app \
   && mkdir -p /data && chown openclaw:openclaw /data \
-  && mkdir -p /home/linuxbrew/.linuxbrew && chown -R openclaw:openclaw /home/linuxbrew
+  && mkdir -p /home/linuxbrew/.linuxbrew && chown -R openclaw:openclaw /home/linuxbrew \
+  && chown -R openclaw:openclaw /usr/local/lib/node_modules/openclaw/dist/extensions/acpx
 
 USER openclaw
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
