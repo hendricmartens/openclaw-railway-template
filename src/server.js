@@ -1176,6 +1176,31 @@ app.use(async (req, res) => {
     }
   }
 
+  // Internal API: write to memory file (for voice bridge post-call summaries)
+  if (req.method === "POST" && req.path === "/memory") {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader || authHeader !== `Bearer ${OPENCLAW_GATEWAY_TOKEN}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const stateDir = process.env.OPENCLAW_STATE_DIR || path.join(require("os").homedir(), ".openclaw");
+      const workspaceDir = process.env.OPENCLAW_WORKSPACE_DIR || path.join(stateDir, "workspace");
+      const memoryDir = path.join(workspaceDir, "memory");
+      if (!fs.default.existsSync(memoryDir)) {
+        fs.default.mkdirSync(memoryDir, { recursive: true });
+      }
+      const { date, content: memContent } = req.body || {};
+      const today = date || new Date().toISOString().slice(0, 10);
+      const filePath = path.join(memoryDir, `${today}.md`);
+      fs.default.appendFileSync(filePath, "\n" + memContent, "utf8");
+      return res.json({ ok: true, file: `memory/${today}.md` });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // Internal API: serve agent prompts for other services (voice bridge, etc.)
   if (req.path === "/prompts") {
     try {
