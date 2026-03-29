@@ -14,11 +14,6 @@ RUN apt-get update \
 
 RUN npm install -g openclaw@2026.3.24 clawhub@latest
 
-# Fix acpx plugin permissions and pre-install binary
-RUN chown -R 1000:1000 /usr/local/lib/node_modules/openclaw/dist/extensions/acpx \
-  && cd /usr/local/lib/node_modules/openclaw/dist/extensions/acpx \
-  && npm install acpx@0.3.1
-
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
@@ -27,13 +22,16 @@ RUN corepack enable && pnpm install --frozen-lockfile --prod
 COPY src ./src
 COPY --chmod=755 entrypoint.sh ./entrypoint.sh
 
-RUN useradd -m -s /bin/bash -u 1000 openclaw \
+RUN useradd -m -s /bin/bash openclaw \
   && chown -R openclaw:openclaw /app \
   && mkdir -p /data && chown openclaw:openclaw /data \
   && mkdir -p /home/linuxbrew/.linuxbrew && chown -R openclaw:openclaw /home/linuxbrew \
   && chown -R openclaw:openclaw /usr/local/lib/node_modules/openclaw/dist/extensions/acpx
 
+# Pre-install acpx binary as openclaw user to avoid EACCES at runtime
 USER openclaw
+RUN cd /usr/local/lib/node_modules/openclaw/dist/extensions/acpx && npm install acpx@0.3.1
+
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
