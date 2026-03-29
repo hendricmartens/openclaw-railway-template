@@ -1187,9 +1187,14 @@ app.use(async (req, res) => {
         try { return fs.default.readFileSync(path.join(workspaceDir, name), "utf8"); }
         catch { return ""; }
       };
-      const today = new Date().toISOString().slice(0, 10);
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      const memory = readFile(`memory/${today}.md`) || readFile(`memory/${yesterday}.md`) || "";
+      // Collect last 14 days of memory files
+      const memoryParts = [];
+      for (let i = 0; i < 14; i++) {
+        const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const m = readFile(`memory/${date}.md`);
+        if (m) memoryParts.push(`## ${date}\n${m}`);
+      }
+      const memory = memoryParts.join("\n\n");
       return res.json({
         soul: readFile("SOUL.md"),
         user: readFile("USER.md"),
