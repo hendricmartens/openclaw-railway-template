@@ -1176,6 +1176,56 @@ app.use(async (req, res) => {
     }
   }
 
+  // Internal API: synchronous agent ask - voice bridge can call this and get a response
+  if (req.method === "POST" && req.path === "/ask") {
+    const authHeader = req.headers["authorization"];
+    if (!authHeader || authHeader !== `Bearer ${OPENCLAW_GATEWAY_TOKEN}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const { message, timeout_ms } = req.body || {};
+    if (!message) return res.status(400).json({ error: "message required" });
+    
+    try {
+      // Run agent turn and wait for completion
+      const maxWait = Math.min(timeout_ms || 25000, 30000);
+      const startTime = Date.now();
+      
+      // Fire hook to main agent
+      const hookUrl = `http://127.0.0.1:${INTERNAL_GATEWAY_PORT}/hooks/agent`;
+      const hookResp = await fetch(hookUrl, {
+        method: "POST",
+        headers: { "Authorization": `Bearer aWGXWWXehUKXl9CZWfC-2zsb7iQFp7gwLW1iIJW5cwM`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message, sessionKey: "ask:voice" })
+      });
+      const hookData = await hookResp.json();
+      const runId = hookData.runId;
+      
+      if (!runId) return res.status(500).json({ error: "No runId from hook" });
+      
+      // Poll for completion
+      while (Date.now() - startTime < maxWait) {
+        await new Promise(r => setTimeout(r, 500));
+        try {
+          const runResp = await fetch(`http://127.0.0.1:${INTERNAL_GATEWAY_PORT}/api/v1/runs/${runId}`, {
+            headers: { "Authorization": `Bearer ${OPENCLAW_GATEWAY_TOKEN}` }
+          });
+          if (runResp.ok) {
+            const runData = await runResp.json();
+            if (runData.status === "completed" && runData.output) {
+              return res.json({ ok: true, response: runData.output });
+            }
+            if (runData.status === "error") {
+              return res.status(500).json({ error: runData.error || "Agent error" });
+            }
+          }
+        } catch (_) {}
+      }
+      return res.status(408).json({ error: "Timeout waiting for agent response" });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // Internal API: write to memory file (for voice bridge post-call summaries)
   if (req.method === "POST" && req.path === "/memory") {
     const authHeader = req.headers["authorization"];
